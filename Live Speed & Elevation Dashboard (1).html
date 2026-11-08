@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Speed & Elevation Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f3f4f6;
+            touch-action: manipulation;
+        }
+
+        .digital-font {
+            font-family: 'Chakra Petch', sans-serif;
+        }
+
+        /* Subtle glowing utility effects for dark HUD dashboard aesthetic */
+        .glow-cyan {
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .glow-emerald {
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+        .box-glow {
+            box-shadow: 0 0 30px -5px rgba(6, 182, 212, 0.15);
+        }
+
+        /* Compass transition */
+        #compass-arrow {
+            transition: transform 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-6 select-none overflow-x-hidden">
+
+    <!-- Top Bar: Status indicators & Utilities -->
+    <header class="w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 bg-slate-900/80 backdrop-blur-md p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="flex items-center space-x-3">
+            <div id="gps-status-dot" class="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse"></div>
+            <div>
+                <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">GPS Signal</div>
+                <div id="gps-status-text" class="text-sm font-bold text-amber-400">Acquiring Fix...</div>
+            </div>
+        </div>
+
+        <!-- System controls & stats -->
+        <div class="flex items-center space-x-2 sm:space-x-4">
+            <!-- Accuracy Badge -->
+            <div class="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700/80 text-xs font-medium flex items-center gap-1.5">
+                <i data-lucide="target" class="w-4 h-4 text-cyan-400"></i>
+                <span class="text-slate-400 hidden sm:inline">Accuracy:</span>
+                <span id="gps-accuracy" class="text-slate-200 font-semibold">-- m</span>
+            </div>
+
+            <!-- Wake Lock Toggle Button -->
+            <button id="wakelock-btn" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all flex items-center gap-2 text-xs font-semibold text-slate-300 active:scale-95">
+                <i data-lucide="sun" id="wakelock-icon" class="w-4 h-4 text-slate-400"></i>
+                <span id="wakelock-text" class="hidden sm:inline">Keep Awake</span>
+            </button>
+
+            <!-- Fullscreen Toggle -->
+            <button id="fullscreen-btn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all text-slate-300 active:scale-95">
+                <i data-lucide="maximize" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Live Telemetry Grid -->
+    <main class="w-full max-w-5xl mx-auto my-auto py-4 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        
+        <!-- Primary Metric 1: SPEED -->
+        <div class="bg-slate-900/60 border border-slate-800/90 rounded-3xl p-6 sm:p-8 flex flex-col justify-between items-center text-center relative overflow-hidden box-glow min-h-[260px] sm:min-h-[320px]">
+            <div class="w-full flex justify-between items-center z-10">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="gauge" class="w-5 h-5 text-cyan-400"></i>
+                    <span class="text-sm font-bold uppercase tracking-widest text-slate-400">Live Speed</span>
+                </div>
+                <!-- Unit Switcher Button -->
+                <button id="unit-speed-toggle" class="px-3 py-1 rounded-xl bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 text-xs font-bold uppercase hover:bg-cyan-900/50 transition-all">
+                    Units: <span id="speed-unit-label" class="text-white">MPH</span>
+                </button>
+            </div>
+
+            <!-- Value Display -->
+            <div class="my-auto py-2 z-10">
+                <div id="speed-val" class="digital-font text-7xl sm:text-9xl font-bold tracking-tight text-cyan-400 glow-cyan">
+                    0
+                </div>
+            </div>
+
+            <div class="w-full flex justify-between items-center text-xs text-slate-500 border-t border-slate-800/60 pt-3 z-10">
+                <span>Max: <span id="max-speed-val" class="text-slate-300 font-semibold">0</span> <span class="unit-speed">mph</span></span>
+                <span>Avg: <span id="avg-speed-val" class="text-slate-300 font-semibold">0</span> <span class="unit-speed">mph</span></span>
+            </div>
+            
+            <!-- Subtle background accent glow -->
+            <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        </div>
+
+        <!-- Primary Metric 2: ELEVATION / ALTITUDE -->
+        <div class="bg-slate-900/60 border border-slate-800/90 rounded-3xl p-6 sm:p-8 flex flex-col justify-between items-center text-center relative overflow-hidden box-glow min-h-[260px] sm:min-h-[320px]">
+            <div class="w-full flex justify-between items-center z-10">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="mountain" class="w-5 h-5 text-emerald-400"></i>
+                    <span class="text-sm font-bold uppercase tracking-widest text-slate-400">Elevation</span>
+                </div>
+                <!-- Unit Switcher Button -->
+                <button id="unit-elev-toggle" class="px-3 py-1 rounded-xl bg-emerald-950/80 border border-emerald-800/60 text-emerald-300 text-xs font-bold uppercase hover:bg-emerald-900/50 transition-all">
+                    Units: <span id="elev-unit-label" class="text-white">FT</span>
+                </button>
+            </div>
+
+            <!-- Value Display -->
+            <div class="my-auto py-2 z-10">
+                <div id="elev-val" class="digital-font text-7xl sm:text-9xl font-bold tracking-tight text-emerald-400 glow-emerald">
+                    --
+                </div>
+            </div>
+
+            <div class="w-full flex justify-between items-center text-xs text-slate-500 border-t border-slate-800/60 pt-3 z-10">
+                <span>Highest: <span id="max-elev-val" class="text-slate-300 font-semibold">--</span> <span class="unit-elev">ft</span></span>
+                <span>Vert gain: <span id="gain-elev-val" class="text-slate-300 font-semibold">0</span> <span class="unit-elev">ft</span></span>
+            </div>
+
+            <!-- Subtle background accent glow -->
+            <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        </div>
+
+    </main>
+
+    <!-- Secondary Telemetry Footer Strip -->
+    <footer class="w-full max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3">
+        <!-- Heading / Compass -->
+        <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex items-center space-x-3">
+            <div class="p-2.5 rounded-xl bg-slate-800/80 text-amber-400 flex justify-center items-center">
+                <i data-lucide="navigation" id="compass-arrow" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Heading</div>
+                <div class="text-base font-bold text-slate-100"><span id="heading-val">--</span>° <span id="heading-dir" class="text-xs text-amber-400 font-mono">--</span></div>
+            </div>
+        </div>
+
+        <!-- Coordinates -->
+        <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex items-center space-x-3">
+            <div class="p-2.5 rounded-xl bg-slate-800/80 text-blue-400">
+                <i data-lucide="map-pin" class="w-6 h-6"></i>
+            </div>
+            <div class="overflow-hidden">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Coordinates</div>
+                <div id="lat-val" class="text-xs font-mono font-medium text-slate-200 truncate">Lat: --</div>
+                <div id="lng-val" class="text-xs font-mono font-medium text-slate-200 truncate">Lng: --</div>
+            </div>
+        </div>
+
+        <!-- Trip Distance -->
+        <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex items-center space-x-3">
+            <div class="p-2.5 rounded-xl bg-slate-800/80 text-purple-400">
+                <i data-lucide="route" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Trip Distance</div>
+                <div class="text-base font-bold text-slate-100"><span id="trip-dist-val">0.0</span> <span class="unit-dist text-xs text-slate-400">mi</span></div>
+            </div>
+        </div>
+
+        <!-- Duration / Active status -->
+        <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex items-center space-x-3">
+            <div class="p-2.5 rounded-xl bg-slate-800/80 text-rose-400">
+                <i data-lucide="clock" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Active Time</div>
+                <div id="trip-time-val" class="text-base font-mono font-bold text-slate-100">00:00:00</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Permission/Error Modal Overlay -->
+    <div id="error-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+            <div class="w-16 h-16 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+            </div>
+            <h3 id="error-title" class="text-xl font-bold text-slate-100">Location Access Required</h3>
+            <p id="error-msg" class="text-sm text-slate-400 leading-relaxed">
+                This dashboard requires real-time GPS access to display your speed, elevation, and location data. Please enable location permissions for your browser.
+            </p>
+            <button id="retry-btn" class="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-all shadow-lg active:scale-95">
+                Grant Access & Retry
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- State Management ---
+        const state = {
+            useImperial: true, // true = mph/ft/mi, false = km/h/m/km
+            watchId: null,
+            wakeLock: null,
+            
+            // Raw Metrics
+            currentSpeedMPS: 0,
+            currentElevMeters: null,
+            headingDegrees: null,
+            accuracyMeters: 0,
+            
+            // Session Tracking
+            maxSpeedMPS: 0,
+            speedSamples: [],
+            highestElevMeters: -Infinity,
+            startingElevMeters: null,
+            totalDistanceMeters: 0,
+            lastCoords: null,
+            startTime: null,
+            timerInterval: null
+        };
+
+        // --- DOM Elements ---
+        const el = {
+            speedVal: document.getElementById('speed-val'),
+            speedUnitLabel: document.getElementById('speed-unit-label'),
+            unitSpeedToggle: document.getElementById('unit-speed-toggle'),
+            maxSpeedVal: document.getElementById('max-speed-val'),
+            avgSpeedVal: document.getElementById('avg-speed-val'),
+            
+            elevVal: document.getElementById('elev-val'),
+            elevUnitLabel: document.getElementById('elev-unit-label'),
+            unitElevToggle: document.getElementById('unit-elev-toggle'),
+            maxElevVal: document.getElementById('max-elev-val'),
+            gainElevVal: document.getElementById('gain-elev-val'),
+            
+            gpsStatusDot: document.getElementById('gps-status-dot'),
+            gpsStatusText: document.getElementById('gps-status-text'),
+            gpsAccuracy: document.getElementById('gps-accuracy'),
+            
+            headingVal: document.getElementById('heading-val'),
+            headingDir: document.getElementById('heading-dir'),
+            compassArrow: document.getElementById('compass-arrow'),
+            
+            latVal: document.getElementById('lat-val'),
+            lngVal: document.getElementById('lng-val'),
+            
+            tripDistVal: document.getElementById('trip-dist-val'),
+            tripTimeVal: document.getElementById('trip-time-val'),
+            
+            wakelockBtn: document.getElementById('wakelock-btn'),
+            wakelockIcon: document.getElementById('wakelock-icon'),
+            wakelockText: document.getElementById('wakelock-text'),
+            fullscreenBtn: document.getElementById('fullscreen-btn'),
+            
+            errorModal: document.getElementById('error-modal'),
+            errorTitle: document.getElementById('error-title'),
+            errorMsg: document.getElementById('error-msg'),
+            retryBtn: document.getElementById('retry-btn')
+        };
+
+        // --- Helper Calculations & Conversion Functions ---
+        const MPS_TO_MPH = 2.23694;
+        const MPS_TO_KMH = 3.6;
+        const METERS_TO_FEET = 3.28084;
+        const METERS_TO_MILES = 0.000621371;
+
+        function formatSpeed(mps) {
+            if (mps === null || mps < 0.5) return '0'; // filter low GPS jitter
+            const val = state.useImperial ? mps * MPS_TO_MPH : mps * MPS_TO_KMH;
+            return Math.round(val).toString();
+        }
+
+        function formatElev(meters) {
+            if (meters === null || isNaN(meters)) return '--';
+            const val = state.useImperial ? meters * METERS_TO_FEET : meters;
+            return Math.round(val).toLocaleString();
+        }
+
+        function formatDist(meters) {
+            const val = state.useImperial ? meters * METERS_TO_MILES : meters / 1000;
+            return val.toFixed(1);
+        }
+
+        function getCardinalDirection(deg) {
+            if (deg === null || isNaN(deg)) return '--';
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(deg / 45) % 8;
+            return directions[index];
+        }
+
+        // Haversine formula to calculate distance between coordinates
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // --- UI Update Renderer ---
+        function updateUI() {
+            // Speed
+            el.speedVal.innerText = formatSpeed(state.currentSpeedMPS);
+            el.maxSpeedVal.innerText = formatSpeed(state.maxSpeedMPS);
+            
+            const avgMPS = state.speedSamples.length > 0 
+                ? state.speedSamples.reduce((a, b) => a + b, 0) / state.speedSamples.length 
+                : 0;
+            el.avgSpeedVal.innerText = formatSpeed(avgMPS);
+
+            // Elevation
+            el.elevVal.innerText = formatElev(state.currentElevMeters);
+            el.maxElevVal.innerText = state.highestElevMeters !== -Infinity ? formatElev(state.highestElevMeters) : '--';
+            
+            const gain = (state.startingElevMeters !== null && state.currentElevMeters !== null)
+                ? Math.max(0, state.currentElevMeters - state.startingElevMeters)
+                : 0;
+            el.gainElevVal.innerText = formatElev(gain);
+
+            // Heading & Compass
+            if (state.headingDegrees !== null && !isNaN(state.headingDegrees)) {
+                el.headingVal.innerText = Math.round(state.headingDegrees);
+                el.headingDir.innerText = getCardinalDirection(state.headingDegrees);
+                el.compassArrow.style.transform = `rotate(${state.headingDegrees}deg)`;
+            } else {
+                el.headingVal.innerText = '--';
+                el.headingDir.innerText = '--';
+                el.compassArrow.style.transform = 'rotate(0deg)';
+            }
+
+            // Accuracy
+            if (state.accuracyMeters) {
+                const accFormatted = state.useImperial 
+                    ? Math.round(state.accuracyMeters * METERS_TO_FEET) + ' ft' 
+                    : Math.round(state.accuracyMeters) + ' m';
+                el.gpsAccuracy.innerText = accFormatted;
+
+                // Color code status dot based on accuracy
+                if (state.accuracyMeters <= 10) {
+                    el.gpsStatusDot.className = 'w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50';
+                    el.gpsStatusText.innerText = 'High Accuracy GPS';
+                    el.gpsStatusText.className = 'text-sm font-bold text-emerald-400';
+                } else if (state.accuracyMeters <= 30) {
+                    el.gpsStatusDot.className = 'w-3.5 h-3.5 rounded-full bg-cyan-500';
+                    el.gpsStatusText.innerText = 'Medium Fix';
+                    el.gpsStatusText.className = 'text-sm font-bold text-cyan-400';
+                } else {
+                    el.gpsStatusDot.className = 'w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse';
+                    el.gpsStatusText.innerText = 'Low Precision Fix';
+                    el.gpsStatusText.className = 'text-sm font-bold text-amber-400';
+                }
+            }
+
+            // Trip Distance
+            el.tripDistVal.innerText = formatDist(state.totalDistanceMeters);
+
+            // Unit Label Texts
+            document.querySelectorAll('.unit-speed').forEach(e => e.innerText = state.useImperial ? 'mph' : 'km/h');
+            document.querySelectorAll('.unit-elev').forEach(e => e.innerText = state.useImperial ? 'ft' : 'm');
+            document.querySelectorAll('.unit-dist').forEach(e => e.innerText = state.useImperial ? 'mi' : 'km');
+        }
+
+        // --- Geolocation Handler ---
+        function handlePositionUpdate(position) {
+            hideError();
+            const coords = position.coords;
+
+            // Start timer on first valid fix
+            if (!state.startTime) {
+                state.startTime = Date.now();
+                startTimer();
+            }
+
+            // 1. Accuracy
+            state.accuracyMeters = coords.accuracy || 0;
+
+            // 2. Speed (coords.speed comes in m/s)
+            if (coords.speed !== null && !isNaN(coords.speed) && coords.speed >= 0) {
+                state.currentSpeedMPS = coords.speed;
+                if (coords.speed > state.maxSpeedMPS) {
+                    state.maxSpeedMPS = coords.speed;
+                }
+                if (coords.speed > 0.5) { // Filter static noise for averages
+                    state.speedSamples.push(coords.speed);
+                }
+            } else {
+                state.currentSpeedMPS = 0;
+            }
+
+            // 3. Elevation (coords.altitude in meters)
+            if (coords.altitude !== null && !isNaN(coords.altitude)) {
+                state.currentElevMeters = coords.altitude;
+                if (state.startingElevMeters === null) {
+                    state.startingElevMeters = coords.altitude;
+                }
+                if (coords.altitude > state.highestElevMeters) {
+                    state.highestElevMeters = coords.altitude;
+                }
+            }
+
+            // 4. Heading (degrees 0-360)
+            if (coords.heading !== null && !isNaN(coords.heading)) {
+                state.headingDegrees = coords.heading;
+            }
+
+            // 5. Coordinates & Distance accumulation
+            const lat = coords.latitude;
+            const lng = coords.longitude;
+            el.latVal.innerText = `Lat: ${lat.toFixed(5)}`;
+            el.lngVal.innerText = `Lng: ${lng.toFixed(5)}`;
+
+            if (state.lastCoords) {
+                const dist = calculateDistance(state.lastCoords.lat, state.lastCoords.lng, lat, lng);
+                // Only accumulate reasonable distances (filters GPS jumps while stationary)
+                if (dist > 2 && dist < 500) { 
+                    state.totalDistanceMeters += dist;
+                }
+            }
+            state.lastCoords = { lat, lng };
+
+            updateUI();
+        }
+
+        function handlePositionError(error) {
+            let msg = 'An unknown error occurred while retrieving GPS signal.';
+            let title = 'GPS Error';
+
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    title = 'Location Permission Denied';
+                    msg = 'Please allow location access in your browser settings so the dashboard can compute live speed and altitude.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    title = 'GPS Signal Lost';
+                    msg = 'Unable to determine your location. Please check that your device location services are enabled and you have clear sky visibility.';
+                    break;
+                case error.TIMEOUT:
+                    title = 'GPS Connection Timeout';
+                    msg = 'Location request timed out. Retrying connection...';
+                    break;
+            }
+
+            showError(title, msg);
+            el.gpsStatusDot.className = 'w-3.5 h-3.5 rounded-full bg-red-500';
+            el.gpsStatusText.innerText = 'GPS Disabled / Offline';
+            el.gpsStatusText.className = 'text-sm font-bold text-red-400';
+        }
+
+        function initGeolocation() {
+            if (!('geolocation' in navigator)) {
+                showError('Hardware Unsupported', 'Your browser or device does not support the Geolocation API.');
+                return;
+            }
+
+            const options = {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 15000
+            };
+
+            if (state.watchId !== null) {
+                navigator.geolocation.clearWatch(state.watchId);
+            }
+
+            state.watchId = navigator.geolocation.watchPosition(
+                handlePositionUpdate,
+                handlePositionError,
+                options
+            );
+        }
+
+        // --- Screen Wake Lock API ---
+        async function toggleWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    if (state.wakeLock) {
+                        await state.wakeLock.release();
+                        state.wakeLock = null;
+                        updateWakeLockUI(false);
+                    } else {
+                        state.wakeLock = await navigator.wakeLock.request('screen');
+                        updateWakeLockUI(true);
+                        state.wakeLock.addEventListener('release', () => {
+                            state.wakeLock = null;
+                            updateWakeLockUI(false);
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Wake Lock Error: ${err.name}, ${err.message}`);
+                }
+            } else {
+                showError('Wake Lock Unsupported', 'The Screen Wake Lock API is not supported on this browser. You can manually adjust your device screen sleep timer.');
+            }
+        }
+
+        function updateWakeLockUI(active) {
+            if (active) {
+                el.wakelockBtn.className = 'px-3.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-300 transition-all flex items-center gap-2 text-xs font-semibold active:scale-95 shadow-lg shadow-amber-500/10';
+                el.wakelockIcon.setAttribute('class', 'w-4 h-4 text-amber-400 fill-amber-400');
+                el.wakelockText.innerText = 'Awake: ON';
+            } else {
+                el.wakelockBtn.className = 'px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all flex items-center gap-2 text-xs font-semibold text-slate-300 active:scale-95';
+                el.wakelockIcon.setAttribute('class', 'w-4 h-4 text-slate-400');
+                el.wakelockText.innerText = 'Keep Awake';
+            }
+        }
+
+        // Automatically re-apply wake lock if tab regains focus
+        document.addEventListener('visibilitychange', async () => {
+            if (state.wakeLock !== null && document.visibilityState === 'visible') {
+                state.wakeLock = await navigator.wakeLock.request('screen');
+            }
+        });
+
+        // --- Active Session Timer ---
+        function startTimer() {
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            state.timerInterval = setInterval(() => {
+                if (!state.startTime) return;
+                const elapsedSeconds = Math.floor((Date.now() - state.startTime) / 1000);
+                const hrs = Math.floor(elapsedSeconds / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((elapsedSeconds % 3600) / 60).toString().padStart(2, '0');
+                const secs = (elapsedSeconds % 60).toString().padStart(2, '0');
+                el.tripTimeVal.innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        }
+
+        // --- Error Modal Handlers ---
+        function showError(title, msg) {
+            el.errorTitle.innerText = title;
+            el.errorMsg.innerText = msg;
+            el.errorModal.classList.remove('hidden');
+        }
+
+        function hideError() {
+            el.errorModal.classList.add('hidden');
+        }
+
+        // --- Event Listeners ---
+        function bindEvents() {
+            // Speed unit toggle
+            el.unitSpeedToggle.addEventListener('click', () => {
+                state.useImperial = !state.useImperial;
+                el.speedUnitLabel.innerText = state.useImperial ? 'MPH' : 'KM/H';
+                el.elevUnitLabel.innerText = state.useImperial ? 'FT' : 'M';
+                updateUI();
+            });
+
+            // Elevation unit toggle
+            el.unitElevToggle.addEventListener('click', () => {
+                state.useImperial = !state.useImperial;
+                el.speedUnitLabel.innerText = state.useImperial ? 'MPH' : 'KM/H';
+                el.elevUnitLabel.innerText = state.useImperial ? 'FT' : 'M';
+                updateUI();
+            });
+
+            // Wake lock toggle
+            el.wakelockBtn.addEventListener('click', toggleWakeLock);
+
+            // Fullscreen toggle
+            el.fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                    });
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+
+            // Retry permissions button
+            el.retryBtn.addEventListener('click', () => {
+                hideError();
+                initGeolocation();
+            });
+        }
+
+        // --- Initialize App ---
+        window.onload = () => {
+            // Initialize Lucide icons
+            lucide.createIcons();
+            
+            bindEvents();
+            initGeolocation();
+            updateUI();
+        };
+    </script>
+</body>
+</html>
